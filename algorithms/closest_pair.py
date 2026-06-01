@@ -42,7 +42,7 @@ def closest_pair_dc(points_a, points_b):
     steps = []
 
     start = time.perf_counter()
-    best_pair, best_dist = _closest_rec(pts_sorted_x, comparisons, steps)
+    best_pair, best_dist = _closest_rec(pts_sorted_x, comparisons, steps, depth=0)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
     steps.append({
@@ -52,6 +52,8 @@ def closest_pair_dc(points_a, points_b):
         "strip_points": [],
         "best_pair": best_pair,
     })
+
+    print(f"  [D&C] Passos gravados para animacao: {len(steps)}")
 
     return {
         "pair": best_pair,
@@ -78,56 +80,63 @@ def _brute_force_rec(pts, comparisons):
     return best_pair, best_dist
 
 
-def _closest_rec(pts_sorted_x, comparisons, steps):
+_MAX_ANIM_DEPTH = 2  # grava steps apenas nos 3 níveis mais externos da recursão
+
+
+def _closest_rec(pts_sorted_x, comparisons, steps, depth=0):
     """
     Recursão principal do Dividir e Conquistar.
 
     pts_sorted_x deve estar ordenado por x antes da chamada.
     comparisons é uma lista de um elemento usada como contador mutável.
-    steps acumula os eventos relevantes para animação.
+    steps acumula os eventos dos primeiros _MAX_ANIM_DEPTH níveis para animação.
     """
     n = len(pts_sorted_x)
 
-    # Caso base: força bruta para 3 ou menos pontos
     if n <= 3:
         return _brute_force_rec(pts_sorted_x, comparisons)
 
     mid = n // 2
-    mid_point = pts_sorted_x[mid]
-    line_x = mid_point["x"]
+    line_x = pts_sorted_x[mid]["x"]
+    left   = pts_sorted_x[:mid]
+    right  = pts_sorted_x[mid:]
 
-    left = pts_sorted_x[:mid]
-    right = pts_sorted_x[mid:]
+    record = depth <= _MAX_ANIM_DEPTH
 
-    steps.append({
-        "action": "divide",
-        "line_L": line_x,
-        "delta": None,
-        "strip_points": [],
-        "best_pair": None,
-    })
+    # Registra divide antes da recursão para preservar a ordem de animação.
+    # delta é preenchido depois, quando a recursão retorna.
+    divide_idx = None
+    if record:
+        divide_idx = len(steps)
+        steps.append({
+            "action": "divide",
+            "line_L": line_x,
+            "delta": None,
+            "strip_points": [],
+            "best_pair": None,
+        })
 
-    pair_left, dist_left = _closest_rec(left, comparisons, steps)
-    pair_right, dist_right = _closest_rec(right, comparisons, steps)
+    pair_left,  dist_left  = _closest_rec(left,  comparisons, steps, depth + 1)
+    pair_right, dist_right = _closest_rec(right, comparisons, steps, depth + 1)
 
     if dist_left <= dist_right:
         best_pair, delta = pair_left, dist_left
     else:
         best_pair, delta = pair_right, dist_right
 
-    # Filtra a faixa central |x - L| < δ e ordena por y
     strip = [p for p in pts_sorted_x if abs(p["x"] - line_x) < delta]
     strip.sort(key=lambda p: p["y"])
 
-    steps.append({
-        "action": "strip",
-        "line_L": line_x,
-        "delta": delta,
-        "strip_points": strip[:],
-        "best_pair": best_pair,
-    })
+    if record:
+        steps[divide_idx]["delta"] = delta
+        steps.append({
+            "action": "strip",
+            "line_L": line_x,
+            "delta": delta,
+            "strip_points": strip[:],
+            "best_pair": best_pair,
+        })
 
-    # Verifica no máximo 7 vizinhos por ponto na faixa (prova clássica)
     for i in range(len(strip)):
         j = i + 1
         while j < len(strip) and (strip[j]["y"] - strip[i]["y"]) < delta:
@@ -137,7 +146,6 @@ def _closest_rec(pts_sorted_x, comparisons, steps):
                 delta = dist
                 best_pair = (strip[i], strip[j])
             j += 1
-            # Limite teórico de 7 vizinhos; mantido explícito para clareza
             if j - i > 7:
                 break
 

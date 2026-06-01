@@ -1,7 +1,8 @@
 """
 Implementação do algoritmo Par de Pontos Mais Próximos via Força Bruta.
 
-Complexidade: O(n * m), onde n = |points_a| e m = |points_b|.
+Complexidade: O(n²), onde n = |points_a| + |points_b|.
+Avalia todos os n*(n-1)/2 pares do conjunto unificado.
 Usado como baseline de corretude para validar o Dividir e Conquistar.
 """
 
@@ -16,9 +17,10 @@ def euclidean_distance(p1, p2):
 
 def brute_force_closest(points_a, points_b):
     """
-    Encontra o par mais próximo entre points_a e points_b por força bruta.
+    Encontra o par mais próximo no conjunto unificado points_a + points_b.
 
-    Itera todos os pares (a, b) com a ∈ points_a e b ∈ points_b.
+    Avalia todos os n*(n-1)/2 pares — mesma semântica do Dividir e Conquistar,
+    permitindo comparação direta de corretude e desempenho.
 
     Retorna dict com:
         pair        – tupla (p1, p2) com os pontos mais próximos
@@ -26,8 +28,9 @@ def brute_force_closest(points_a, points_b):
         comparisons – número total de pares avaliados
         time_ms     – tempo de execução em milissegundos
     """
-    if not points_a or not points_b:
-        raise ValueError("Ambas as listas devem conter ao menos um ponto.")
+    all_points = points_a + points_b
+    if len(all_points) < 2:
+        raise ValueError("São necessários ao menos 2 pontos no total.")
 
     best_pair = None
     best_dist = math.inf
@@ -35,13 +38,13 @@ def brute_force_closest(points_a, points_b):
 
     start = time.perf_counter()
 
-    for a in points_a:
-        for b in points_b:
-            dist = euclidean_distance(a, b)
+    for i in range(len(all_points)):
+        for j in range(i + 1, len(all_points)):
+            dist = euclidean_distance(all_points[i], all_points[j])
             comparisons += 1
             if dist < best_dist:
                 best_dist = dist
-                best_pair = (a, b)
+                best_pair = (all_points[i], all_points[j])
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 

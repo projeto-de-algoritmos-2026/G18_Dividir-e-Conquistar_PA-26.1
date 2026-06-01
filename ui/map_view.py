@@ -2,19 +2,26 @@
 Visualização do mapa GPS e gráfico de comparação de performance com matplotlib.
 """
 
+import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 
-_BG_COLOR = "#1a1a2e"
-_GRID_COLOR = "#2a2a4e"
-_CAR_COLOR = "#4fc3f7"
-_PASSENGER_COLOR = "#ef5350"
-_HIGHLIGHT_COLOR = "#ffd600"
-_LINE_COLOR = "#69f0ae"
-_STRIP_COLOR = "#ffd600"
-_DIVIDE_COLOR = "#ffffff"
+_FIG_BG          = "#1a1a2e"   # fundo da figura
+_PLOT_BG         = "#0d1117"   # fundo da área de plotagem
+_GRID_COLOR      = "white"
+_CAR_COLOR       = "#4FC3F7"
+_PASSENGER_COLOR = "#EF5350"
+_HIGHLIGHT_COLOR = "#FFD700"
+_LINE_COLOR      = "#00E676"
+_STRIP_COLOR     = "#FFD700"
+_DIVIDE_COLOR    = "#ffffff"
+_LEFT_COLOR      = "#81D4FA"   # pontos à esquerda da divisão
+_RIGHT_COLOR     = "#FF8C42"   # pontos à direita da divisão
+_MUTED_COLOR     = "#555577"   # pontos fora do foco
+_LEGEND_DARK     = {"facecolor": "#1a1a2e", "edgecolor": "#444466", "labelcolor": "white"}
+_LEGEND_RIGHT    = "upper right"
 
 
 def draw_map(cars, passengers, result=None, step=None):
@@ -29,66 +36,37 @@ def draw_map(cars, passengers, result=None, step=None):
     """
     fig, ax = _make_dark_axes(figsize=(10, 10))
 
-    # Pontos base
-    if cars:
-        ax.scatter(
-            [p["x"] for p in cars],
-            [p["y"] for p in cars],
-            c=_CAR_COLOR, marker="^", s=100, label="Carros", zorder=3,
-        )
-
-    if passengers:
-        ax.scatter(
-            [p["x"] for p in passengers],
-            [p["y"] for p in passengers],
-            c=_PASSENGER_COLOR, marker="o", s=100, label="Passageiros", zorder=3,
-        )
+    _draw_points(ax, cars, passengers)
 
     # Sobreposições de passo de animação
     if step is not None:
         action = step.get("action")
         line_l = step.get("line_L")
-        delta = step.get("delta")
+        delta  = step.get("delta")
 
         if action == "divide" and line_l is not None:
             ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--", linewidth=1.2,
-                       alpha=0.7, zorder=2, label="Divisão L")
+                       alpha=0.7, zorder=2, label="Divisao L")
 
         elif action == "strip" and line_l is not None and delta is not None:
             ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--", linewidth=1.0,
                        alpha=0.5, zorder=2)
-            strip_rect = mpatches.Rectangle(
+            ax.add_patch(mpatches.Rectangle(
                 (line_l - delta, 0), width=2 * delta, height=1000,
-                facecolor=_STRIP_COLOR, alpha=0.15, zorder=1, label=f"Faixa δ={delta:.1f}",
-            )
-            ax.add_patch(strip_rect)
+                facecolor=_STRIP_COLOR, alpha=0.15, zorder=1, label=f"Faixa delta={delta:.1f}",
+            ))
 
-    # Destaque do par mais próximo
     if result is not None:
-        p1, p2 = result["pair"]
-        dist = result["distance"]
-
-        ax.scatter([p1["x"], p2["x"]], [p1["y"], p2["y"]],
-                   c=_HIGHLIGHT_COLOR, marker="*", s=300, zorder=5, label="Par mais próximo")
-
-        ax.plot([p1["x"], p2["x"]], [p1["y"], p2["y"]],
-                color=_LINE_COLOR, linewidth=1.8, zorder=4)
-
-        mid_x = (p1["x"] + p2["x"]) / 2
-        mid_y = (p1["y"] + p2["y"]) / 2
-        ax.text(mid_x, mid_y, f"  dist = {dist:.1f}",
-                color=_LINE_COLOR, fontsize=9, va="bottom",
-                bbox={"facecolor": _BG_COLOR, "edgecolor": "none", "alpha": 0.7})
+        _draw_result(ax, result, result["distance"])
 
     ax.set_xlim(0, 1000)
     ax.set_ylim(0, 1000)
-    ax.set_title("GPS Inteligente — Par de Pontos O(n log n)",
-                 color="white", fontsize=13, pad=12)
-    ax.legend(facecolor="#2a2a4e", edgecolor="none", labelcolor="white",
-              fontsize=9, loc="upper right")
+    ax.set_title("GPS Inteligente — Par de Pontos Mais Proximos  O(n log n)",
+                 color="white", fontsize=14, pad=15)
+    ax.legend(**_LEGEND_DARK, fontsize=10, loc=_LEGEND_RIGHT)
 
     fig.tight_layout()
-    fig.savefig("output_map.png", dpi=150, facecolor=_BG_COLOR)
+    fig.savefig("output_map.png", dpi=150, facecolor=_FIG_BG)
     plt.show()
     plt.close(fig)
 
@@ -101,34 +79,68 @@ def draw_comparison(results):
         results – lista de dicts {"n": int, "time_brute": float, "time_dc": float}
     """
     if not results:
-        raise ValueError("A lista de resultados está vazia.")
+        raise ValueError("A lista de resultados esta vazia.")
 
-    ns = [r["n"] for r in results]
+    ns          = [r["n"] for r in results]
     times_brute = [r["time_brute"] for r in results]
-    times_dc = [r["time_dc"] for r in results]
+    times_dc    = [r["time_dc"]    for r in results]
 
     fig, ax = _make_dark_axes(figsize=(10, 6))
 
-    ax.plot(ns, times_dc, color=_CAR_COLOR, linewidth=2, marker="o",
+    ax.plot(ns, times_dc,    color=_CAR_COLOR,       linewidth=2, marker="o",
             markersize=5, label="D&C — O(n log n)")
     ax.plot(ns, times_brute, color=_PASSENGER_COLOR, linewidth=2, marker="s",
-            markersize=5, label="Força Bruta — O(n²)")
+            markersize=5, label="Forca Bruta — O(n²)")
 
-    # Anotação no último ponto de cada série
-    _annotate_endpoint(ax, ns[-1], times_dc[-1], f"{times_dc[-1]:.2f} ms", _CAR_COLOR)
+    _annotate_endpoint(ax, ns[-1], times_dc[-1],    f"{times_dc[-1]:.2f} ms",    _CAR_COLOR)
     _annotate_endpoint(ax, ns[-1], times_brute[-1], f"{times_brute[-1]:.2f} ms", _PASSENGER_COLOR)
 
-    ax.set_xlabel("Número de pontos (n)", color="white", fontsize=11)
-    ax.set_ylabel("Tempo (ms)", color="white", fontsize=11)
-    ax.set_title("Comparação de Performance: O(n²) vs O(n log n)",
-                 color="white", fontsize=13, pad=12)
-    ax.legend(facecolor="#2a2a4e", edgecolor="none", labelcolor="white",
-              fontsize=10, loc="upper left")
+    ax.set_xlabel("Numero de pontos (n)", color="white", fontsize=11)
+    ax.set_ylabel("Tempo (ms)",           color="white", fontsize=11)
+    ax.set_title("Comparacao de Performance: O(n²) vs O(n log n)",
+                 color="white", fontsize=14, pad=15)
+    ax.legend(**_LEGEND_DARK, fontsize=10, loc="upper left")
 
     fig.tight_layout()
-    fig.savefig("output_comparison.png", dpi=150, facecolor=_BG_COLOR)
+    fig.savefig("output_comparison.png", dpi=150, facecolor=_FIG_BG)
     plt.show()
     plt.close(fig)
+
+
+def animate_step_by_step(cars, passengers, steps, result):
+    """
+    Animação interativa passo a passo do algoritmo Dividir e Conquistar.
+
+    Usa loop manual com plt.pause() para exibir cada frame na tela
+    (garante que linhas e faixas apareçam independente do backend).
+    Salva também como "output_animation.gif".
+    """
+    all_points   = cars + passengers
+    total_frames = 1 + len(steps)
+
+    plt.ion()
+    fig, ax = _make_dark_axes(figsize=(10, 10))
+    fig.tight_layout()
+    plt.show(block=False)
+
+    for frame_idx in range(total_frames):
+        _render_frame(ax, frame_idx, steps, all_points, result, total_frames)
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        plt.pause(3.0)
+
+    plt.ioff()
+
+    anim = FuncAnimation(
+        fig,
+        lambda i: _render_frame(ax, i, steps, all_points, result, total_frames),
+        frames=total_frames, interval=3000, repeat=False, blit=False,
+    )
+    gif_path = os.path.abspath("output_animation.gif")
+    anim.save(gif_path, writer=PillowWriter(fps=1 / 3), dpi=100,
+              savefig_kwargs={"facecolor": _FIG_BG})
+    plt.close(fig)
+    print(f"  GIF salvo em: {gif_path}")
 
 
 def animate_algorithm(cars, passengers, steps, result):
@@ -137,12 +149,6 @@ def animate_algorithm(cars, passengers, steps, result):
 
     Frame 0  : todos os pontos, título "Iniciando..."
     Frames 1+: um step por frame (divide / strip / result)
-
-    Parâmetros:
-        cars       – lista de dicts dos carros
-        passengers – lista de dicts dos passageiros
-        steps      – lista de steps retornada por closest_pair_dc
-        result     – dict retornado por closest_pair_dc (usado no frame final)
 
     Salva "output_animation.gif" e exibe na tela.
     """
@@ -155,18 +161,17 @@ def animate_algorithm(cars, passengers, steps, result):
         _reset_ax(ax)
         _draw_points(ax, cars, passengers)
         if frame_idx == 0:
-            ax.set_title("Iniciando...", color="white", fontsize=13, pad=12)
+            ax.set_title("Iniciando...", color="white", fontsize=14, pad=15)
         else:
             _apply_step(ax, steps[frame_idx - 1], result)
-        ax.legend(facecolor="#2a2a4e", edgecolor="none", labelcolor="white",
-                  fontsize=9, loc="upper right")
+        ax.legend(**_LEGEND_DARK, fontsize=10, loc=_LEGEND_RIGHT)
 
     anim = FuncAnimation(fig, _draw_frame, frames=total_frames,
                          interval=1200, repeat=False)
 
     writer = PillowWriter(fps=1000 // 1200 or 1)
     anim.save("output_animation.gif", writer=writer, dpi=100,
-              savefig_kwargs={"facecolor": _BG_COLOR})
+              savefig_kwargs={"facecolor": _FIG_BG})
 
     plt.show()
     plt.close(fig)
@@ -179,11 +184,11 @@ def animate_algorithm(cars, passengers, steps, result):
 def _reset_ax(ax):
     """Limpa o eixo e reaplica o estilo escuro padrão."""
     ax.cla()
-    ax.set_facecolor(_BG_COLOR)
-    ax.grid(True, color=_GRID_COLOR, linewidth=0.6, linestyle="-")
+    ax.set_facecolor(_PLOT_BG)
+    ax.grid(True, color=_GRID_COLOR, linewidth=0.5, linestyle="-", alpha=0.15)
     ax.tick_params(colors="white")
     for spine in ax.spines.values():
-        spine.set_edgecolor(_GRID_COLOR)
+        spine.set_edgecolor("#333355")
     ax.set_xlim(0, 1000)
     ax.set_ylim(0, 1000)
 
@@ -194,13 +199,15 @@ def _draw_points(ax, cars, passengers):
         ax.scatter(
             [p["x"] for p in cars],
             [p["y"] for p in cars],
-            c=_CAR_COLOR, marker="^", s=100, label="Carros", zorder=3,
+            c=_CAR_COLOR, marker="^", s=120, edgecolors="white",
+            linewidths=0.5, label="Carros", zorder=3,
         )
     if passengers:
         ax.scatter(
             [p["x"] for p in passengers],
             [p["y"] for p in passengers],
-            c=_PASSENGER_COLOR, marker="o", s=100, label="Passageiros", zorder=3,
+            c=_PASSENGER_COLOR, marker="o", s=120, edgecolors="white",
+            linewidths=0.5, label="Passageiros", zorder=3,
         )
 
 
@@ -208,53 +215,185 @@ def _apply_step(ax, step, result):
     """Aplica a sobreposição visual correspondente ao action do step."""
     action = step.get("action")
     line_l = step.get("line_L")
-    delta = step.get("delta")
+    delta  = step.get("delta")
 
     if action == "divide" and line_l is not None:
         ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--",
-                   linewidth=1.4, alpha=0.8, zorder=2, label="Divisão L")
-        ax.set_title(f"Dividindo em x={line_l:.0f}", color="white", fontsize=13, pad=12)
+                   linewidth=1.4, alpha=0.8, zorder=2, label="Divisao L")
+        ax.set_title(f"Dividindo em x={line_l:.0f}", color="white", fontsize=14, pad=15)
 
     elif action == "strip" and line_l is not None and delta is not None:
         ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--",
                    linewidth=1.0, alpha=0.5, zorder=2)
         ax.add_patch(mpatches.Rectangle(
             (line_l - delta, 0), width=2 * delta, height=1000,
-            facecolor=_STRIP_COLOR, alpha=0.15, zorder=1, label=f"Faixa δ={delta:.1f}",
+            facecolor=_STRIP_COLOR, alpha=0.15, zorder=1, label=f"Faixa delta={delta:.1f}",
         ))
-        ax.set_title(f"Checando faixa 2δ = {2 * delta:.1f}", color="white", fontsize=13, pad=12)
+        ax.set_title(f"Checando faixa 2delta = {2 * delta:.1f}", color="white", fontsize=14, pad=15)
 
     elif action == "result":
         _draw_result(ax, result, delta)
 
 
 def _draw_result(ax, result, delta):
-    """Destaca o par final com estrela amarela, linha verde e texto de distância."""
+    """Destaca o par final com estrela amarela, linha tracejada verde e label de distância."""
     p1, p2 = result["pair"]
-    dist = result["distance"]
+    dist   = result["distance"]
 
     ax.scatter([p1["x"], p2["x"]], [p1["y"], p2["y"]],
-               c=_HIGHLIGHT_COLOR, marker="*", s=300, zorder=5, label="Par mais próximo")
+               c=_HIGHLIGHT_COLOR, marker="*", s=400, zorder=5, label="Par mais proximo",
+               edgecolors="white", linewidths=0.5)
     ax.plot([p1["x"], p2["x"]], [p1["y"], p2["y"]],
-            color=_LINE_COLOR, linewidth=2.0, zorder=4)
+            color=_LINE_COLOR, linewidth=2, linestyle="--", zorder=4)
     ax.text(
         (p1["x"] + p2["x"]) / 2, (p1["y"] + p2["y"]) / 2,
-        f"  dist = {dist:.1f}", color=_LINE_COLOR, fontsize=9, va="bottom",
-        bbox={"facecolor": _BG_COLOR, "edgecolor": "none", "alpha": 0.7},
+        f"  dist = {dist:.2f}",
+        color=_LINE_COLOR, fontsize=11, va="bottom",
+        bbox={"facecolor": "white", "edgecolor": _LINE_COLOR, "alpha": 0.9, "boxstyle": "round,pad=0.3"},
     )
     title_delta = delta if delta is not None else dist
-    ax.set_title(f"Par mais próximo encontrado! dist={title_delta:.2f}",
-                 color=_HIGHLIGHT_COLOR, fontsize=13, pad=12)
+    ax.set_title(f"Par mais proximo encontrado!  dist = {title_delta:.2f}",
+                 color=_HIGHLIGHT_COLOR, fontsize=14, pad=15)
+
+
+def _render_frame(ax, frame_idx, steps, all_points, result, total_frames):
+    """Desenha um frame completo — usado tanto no loop ao vivo quanto no GIF."""
+    _reset_ax(ax)
+    if frame_idx == 0:
+        _draw_points_from_list(ax, all_points)
+        ax.set_title("Todos os pontos — iniciando busca...",
+                     color="white", fontsize=14, pad=15)
+    else:
+        step = steps[frame_idx - 1]
+        last_strip = None
+        if step["action"] == "result":
+            last_strip = next(
+                (s for s in reversed(steps[:frame_idx - 1]) if s["action"] == "strip"),
+                None,
+            )
+        _draw_step_frame(ax, step, all_points, result, last_strip)
+
+    counter = "Inicio" if frame_idx == 0 else f"Passo {frame_idx} de {total_frames - 1}"
+    ax.text(0.98, 0.02, counter, transform=ax.transAxes,
+            ha="right", va="bottom", color="white", fontsize=9,
+            bbox={"facecolor": "#1a1a2e", "edgecolor": "none", "alpha": 0.75})
+    ax.legend(**_LEGEND_DARK, fontsize=10, loc=_LEGEND_RIGHT)
+
+
+def _draw_points_from_list(ax, all_points):
+    """Plota todos os pontos de uma lista mista usando cor e marcador por type."""
+    cars       = [p for p in all_points if p["type"] == "car"]
+    passengers = [p for p in all_points if p["type"] == "passenger"]
+    _draw_points(ax, cars, passengers)
+
+
+def _draw_step_frame(ax, step, all_points, result, last_strip=None):
+    """Despacha para o helper correto conforme o action do step."""
+    action = step.get("action")
+    if action == "divide":
+        _draw_frame_divide(ax, step, all_points)
+    elif action == "strip":
+        _draw_frame_strip(ax, step, all_points)
+    elif action == "result":
+        _draw_frame_result(ax, step, all_points, result, last_strip)
+
+
+def _draw_frame_divide(ax, step, all_points):
+    """Frame de divisão: pontos coloridos por lado, linha L tracejada."""
+    line_l = step["line_L"]
+    left  = [p for p in all_points if p["x"] <  line_l]
+    right = [p for p in all_points if p["x"] >= line_l]
+
+    if left:
+        ax.scatter([p["x"] for p in left], [p["y"] for p in left],
+                   c=_LEFT_COLOR, marker="o", s=90, edgecolors="white",
+                   linewidths=0.4, label="Esquerda", zorder=3)
+    if right:
+        ax.scatter([p["x"] for p in right], [p["y"] for p in right],
+                   c=_RIGHT_COLOR, marker="o", s=90, edgecolors="white",
+                   linewidths=0.4, label="Direita", zorder=3)
+
+    ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--", linewidth=1.5,
+               alpha=0.9, zorder=4, label="Linha L")
+
+    delta = step.get("delta")
+    delta_str = f"{delta:.1f}" if delta is not None else "---"
+    ax.set_title(f"Dividindo: L = {line_l:.0f}  |  delta atual = {delta_str}",
+                 color="white", fontsize=14, pad=15)
+
+
+def _draw_frame_strip(ax, step, all_points):
+    """Frame de faixa: pontos na faixa destacados, retângulo amarelo sombreado."""
+    line_l = step["line_L"]
+    delta  = step["delta"]
+    strip_xy = {(p["x"], p["y"]) for p in step.get("strip_points", [])}
+
+    in_strip  = [p for p in all_points if (p["x"], p["y"]) in strip_xy]
+    out_strip = [p for p in all_points if (p["x"], p["y"]) not in strip_xy]
+
+    if out_strip:
+        ax.scatter([p["x"] for p in out_strip], [p["y"] for p in out_strip],
+                   c=_MUTED_COLOR, marker="o", s=60, edgecolors="white",
+                   linewidths=0.3, alpha=0.4, zorder=3)
+    if in_strip:
+        ax.scatter([p["x"] for p in in_strip], [p["y"] for p in in_strip],
+                   c=_HIGHLIGHT_COLOR, marker="o", s=130, edgecolors="white",
+                   linewidths=0.5, label="Na faixa", zorder=4)
+
+    ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--", linewidth=1.0,
+               alpha=0.6, zorder=2)
+    ax.add_patch(mpatches.Rectangle(
+        (line_l - delta, 0), width=2 * delta, height=1000,
+        facecolor=_STRIP_COLOR, alpha=0.2, zorder=1,
+    ))
+    ax.set_title(
+        f"Checando faixa 2delta = {2 * delta:.1f} — {len(in_strip)} pontos",
+        color="white", fontsize=14, pad=15,
+    )
+
+
+def _draw_frame_result(ax, step, all_points, result, last_strip=None):
+    """Frame final: linha L + faixa do último strip, par destacado com estrela e caixa."""
+    p1, p2 = result["pair"]
+    dist   = step.get("delta") or result["distance"]
+
+    ax.scatter([p["x"] for p in all_points], [p["y"] for p in all_points],
+               c=_MUTED_COLOR, marker="o", s=60, edgecolors="white",
+               linewidths=0.3, alpha=0.35, zorder=3)
+
+    if last_strip is not None:
+        line_l = last_strip["line_L"]
+        delta  = last_strip["delta"]
+        ax.axvline(x=line_l, color=_DIVIDE_COLOR, linestyle="--",
+                   linewidth=1.0, alpha=0.5, zorder=2)
+        ax.add_patch(mpatches.Rectangle(
+            (line_l - delta, 0), width=2 * delta, height=1000,
+            facecolor=_STRIP_COLOR, alpha=0.15, zorder=1,
+        ))
+
+    ax.scatter([p1["x"], p2["x"]], [p1["y"], p2["y"]],
+               c=_HIGHLIGHT_COLOR, marker="*", s=400, edgecolors="white",
+               linewidths=0.5, label="Par mais proximo", zorder=5)
+    ax.plot([p1["x"], p2["x"]], [p1["y"], p2["y"]],
+            color=_LINE_COLOR, linewidth=2, linestyle="--", zorder=4)
+    ax.text(
+        (p1["x"] + p2["x"]) / 2, (p1["y"] + p2["y"]) / 2,
+        f"Par encontrado! dist = {dist:.2f}",
+        color=_LINE_COLOR, fontsize=11, va="bottom",
+        bbox={"facecolor": "white", "edgecolor": _LINE_COLOR,
+              "alpha": 0.9, "boxstyle": "round,pad=0.3"},
+    )
+    ax.set_title("Par mais proximo encontrado!", color=_HIGHLIGHT_COLOR, fontsize=14, pad=15)
 
 
 def _make_dark_axes(figsize):
     """Cria figura e eixo com tema escuro padronizado."""
-    fig, ax = plt.subplots(figsize=figsize, facecolor=_BG_COLOR)
-    ax.set_facecolor(_BG_COLOR)
-    ax.grid(True, color=_GRID_COLOR, linewidth=0.6, linestyle="-")
+    fig, ax = plt.subplots(figsize=figsize, facecolor=_FIG_BG)
+    ax.set_facecolor(_PLOT_BG)
+    ax.grid(True, color=_GRID_COLOR, linewidth=0.5, linestyle="-", alpha=0.15)
     ax.tick_params(colors="white")
     for spine in ax.spines.values():
-        spine.set_edgecolor(_GRID_COLOR)
+        spine.set_edgecolor("#333355")
     return fig, ax
 
 
