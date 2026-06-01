@@ -29,7 +29,7 @@ O resultado é exibido em três saídas gráficas:
 
 ## Apresentação
 
-> Link do vídeo de apresentação (a ser adicionado)
+[![Apresentação em Vídeo](https://img.youtube.com/vi/WsCJ0A8GAT8/0.jpg)](https://youtu.be/WsCJ0A8GAT8)
 
 ## Screenshots
 
