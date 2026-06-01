@@ -75,9 +75,10 @@ def main():
     print(f"  {'Passos':<14}: {len(dc['steps'])}")
 
     # 4. Validação de corretude
-    assert abs(bf["distance"] - dc["distance"]) < 1e-9, (
-        f"Distancias divergem: bruta={bf['distance']:.6f}  dc={dc['distance']:.6f}"
-    )
+    if abs(bf["distance"] - dc["distance"]) > 1e-9:
+        raise ValueError(
+            f"Distancias divergem: bruta={bf['distance']:.6f}  dc={dc['distance']:.6f}"
+        )
 
     # 5. Resultado final + speedup
     print(f"\n{_SEP}")
@@ -92,7 +93,7 @@ def main():
     print(_SEP)
 
     # 6. Mapa estático com resultado destacado
-    print("\nGerando mapa... (salvo em output_map.png)")
+    print("\nGerando mapa... (salvo em assets/output_map.png)")
     draw_map(cars, passengers, result=dc)
 
     # 7. Animação opcional
@@ -105,7 +106,7 @@ def main():
     resposta = input("\nVer comparacao de performance? (s/n): ").strip().lower()
     if resposta == "s":
         perf_results = run_performance_test()
-        print("\nGerando grafico... (salvo em output_comparison.png)")
+        print("\nGerando grafico... (salvo em assets/output_comparison.png)")
         draw_comparison(perf_results)
 
 

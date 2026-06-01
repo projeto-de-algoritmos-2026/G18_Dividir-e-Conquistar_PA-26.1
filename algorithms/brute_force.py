@@ -6,13 +6,9 @@ Avalia todos os n*(n-1)/2 pares do conjunto unificado.
 Usado como baseline de corretude para validar o Dividir e Conquistar.
 """
 
-import math
 import time
 
-
-def euclidean_distance(p1, p2):
-    """Distância euclidiana entre dois pontos com campos 'x' e 'y'."""
-    return math.sqrt((p1["x"] - p2["x"]) ** 2 + (p1["y"] - p2["y"]) ** 2)
+from algorithms.utils import euclidean_distance
 
 
 def brute_force_closest(points_a, points_b):
@@ -33,7 +29,7 @@ def brute_force_closest(points_a, points_b):
         raise ValueError("São necessários ao menos 2 pontos no total.")
 
     best_pair = None
-    best_dist = math.inf
+    best_dist = float("inf")
     comparisons = 0
 
     start = time.perf_counter()

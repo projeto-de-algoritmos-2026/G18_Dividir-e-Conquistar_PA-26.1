@@ -4,6 +4,8 @@ Geração de conjuntos de pontos simulando coordenadas GPS de carros e passageir
 
 import random
 
+from algorithms.utils import euclidean_distance
+
 
 def generate_cars(n, seed=None):
     """Gera n carros com posições aleatórias no plano 1000x1000."""
@@ -23,33 +25,36 @@ def generate_passengers(n, seed=None):
     ]
 
 
-def generate_city_scenario(n_cars=20, n_passengers=20):
+def generate_city_scenario(n_cars=20, n_passengers=20, seed=None):
     """
     Gera um cenário urbano com carros e passageiros sem sobreposição.
 
-    Usa seeds distintas para carros e passageiros garantindo que os dois grupos
-    não compartilhem posições idênticas mesmo quando n_cars == n_passengers.
+    Parâmetros:
+        n_cars, n_passengers – quantidade de pontos em cada grupo.
+        seed – semente para reprodutibilidade; None mantém seeds padrão (42 / 99).
 
     Retorna:
         (cars, passengers): tupla com as duas listas de dicts.
     """
     MIN_DISTANCE = 1.0
+    seed_cars = 42 if seed is None else seed
+    seed_pass = 99 if seed is None else seed * 7 + 1
 
-    def _generate_points(n, label, point_type, seed, existing):
-        rng = random.Random(seed)
+    def _generate_points(n, label, point_type, rng_seed, existing):
+        rng = random.Random(rng_seed)
         points = []
         attempts = 0
         max_attempts = n * 1000
 
         while len(points) < n and attempts < max_attempts:
             attempts += 1
-            candidate = {"name": f"{label}_{len(points) + 1}",
-                         "x": round(rng.uniform(0, 1000), 4),
-                         "y": round(rng.uniform(0, 1000), 4),
-                         "type": point_type}
-
-            all_points = existing + points
-            if all(_euclidean(candidate, p) >= MIN_DISTANCE for p in all_points):
+            candidate = {
+                "name": f"{label}_{len(points) + 1}",
+                "x": round(rng.uniform(0, 1000), 4),
+                "y": round(rng.uniform(0, 1000), 4),
+                "type": point_type,
+            }
+            if all(euclidean_distance(candidate, p) >= MIN_DISTANCE for p in existing + points):
                 points.append(candidate)
 
         if len(points) < n:
@@ -59,10 +64,6 @@ def generate_city_scenario(n_cars=20, n_passengers=20):
             )
         return points
 
-    cars = _generate_points(n_cars, "Carro", "car", seed=42, existing=[])
-    passengers = _generate_points(n_passengers, "Passageiro", "passenger", seed=99, existing=cars)
+    cars       = _generate_points(n_cars,       "Carro",      "car",       seed_cars, existing=[])
+    passengers = _generate_points(n_passengers, "Passageiro", "passenger", seed_pass, existing=cars)
     return cars, passengers
-
-
-def _euclidean(a, b):
-    return ((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2) ** 0.5

@@ -3,9 +3,10 @@ Visualização do mapa GPS e gráfico de comparação de performance com matplot
 """
 
 import os
+import pathlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import PillowWriter
 
 
 _FIG_BG          = "#1a1a2e"   # fundo da figura
@@ -22,6 +23,13 @@ _RIGHT_COLOR     = "#FF8C42"   # pontos à direita da divisão
 _MUTED_COLOR     = "#555577"   # pontos fora do foco
 _LEGEND_DARK     = {"facecolor": "#1a1a2e", "edgecolor": "#444466", "labelcolor": "white"}
 _LEGEND_RIGHT    = "upper right"
+
+_ASSETS_DIR = pathlib.Path(__file__).parent.parent / "assets"
+_ASSETS_DIR.mkdir(exist_ok=True)
+
+
+def _asset(filename):
+    return str(_ASSETS_DIR / filename)
 
 
 def draw_map(cars, passengers, result=None, step=None):
@@ -66,7 +74,7 @@ def draw_map(cars, passengers, result=None, step=None):
     ax.legend(**_LEGEND_DARK, fontsize=10, loc=_LEGEND_RIGHT)
 
     fig.tight_layout()
-    fig.savefig("output_map.png", dpi=150, facecolor=_FIG_BG)
+    fig.savefig(_asset("output_map.png"), dpi=150, facecolor=_FIG_BG)
     plt.show()
     plt.close(fig)
 
@@ -102,7 +110,7 @@ def draw_comparison(results):
     ax.legend(**_LEGEND_DARK, fontsize=10, loc="upper left")
 
     fig.tight_layout()
-    fig.savefig("output_comparison.png", dpi=150, facecolor=_FIG_BG)
+    fig.savefig(_asset("output_comparison.png"), dpi=150, facecolor=_FIG_BG)
     plt.show()
     plt.close(fig)
 
@@ -111,9 +119,9 @@ def animate_step_by_step(cars, passengers, steps, result):
     """
     Animação interativa passo a passo do algoritmo Dividir e Conquistar.
 
-    Usa loop manual com plt.pause() para exibir cada frame na tela
-    (garante que linhas e faixas apareçam independente do backend).
-    Salva também como "output_animation.gif".
+    Usa loop manual com plt.pause() para exibir cada frame ao vivo e
+    PillowWriter.grab_frame() para salvar o GIF na mesma passagem,
+    evitando renderizar cada frame duas vezes.
     """
     all_points   = cars + passengers
     total_frames = 1 + len(steps)
@@ -123,58 +131,35 @@ def animate_step_by_step(cars, passengers, steps, result):
     fig.tight_layout()
     plt.show(block=False)
 
-    for frame_idx in range(total_frames):
-        _render_frame(ax, frame_idx, steps, all_points, result, total_frames)
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        plt.pause(3.0)
+    gif_path = _asset("output_animation.gif")
+    writer = PillowWriter(fps=1 / 3)
+
+    saved_divide = False
+    saved_strip  = False
+
+    with writer.saving(fig, gif_path, dpi=100):
+        for frame_idx in range(total_frames):
+            _render_frame(ax, frame_idx, steps, all_points, result, total_frames)
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+            writer.grab_frame(facecolor=_FIG_BG)
+
+            # Auto-salva o primeiro frame de cada tipo para o README
+            if frame_idx > 0:
+                action = steps[frame_idx - 1].get("action")
+                if action == "divide" and not saved_divide:
+                    fig.savefig(_asset("divide_step.png"), dpi=150, facecolor=_FIG_BG)
+                    saved_divide = True
+                elif action == "strip" and not saved_strip:
+                    fig.savefig(_asset("strip_step.png"), dpi=150, facecolor=_FIG_BG)
+                    saved_strip = True
+
+            plt.pause(3.0)
 
     plt.ioff()
-
-    anim = FuncAnimation(
-        fig,
-        lambda i: _render_frame(ax, i, steps, all_points, result, total_frames),
-        frames=total_frames, interval=3000, repeat=False, blit=False,
-    )
-    gif_path = os.path.abspath("output_animation.gif")
-    anim.save(gif_path, writer=PillowWriter(fps=1 / 3), dpi=100,
-              savefig_kwargs={"facecolor": _FIG_BG})
     plt.close(fig)
     print(f"  GIF salvo em: {gif_path}")
 
-
-def animate_algorithm(cars, passengers, steps, result):
-    """
-    Anima a execução do algoritmo Dividir e Conquistar frame a frame.
-
-    Frame 0  : todos os pontos, título "Iniciando..."
-    Frames 1+: um step por frame (divide / strip / result)
-
-    Salva "output_animation.gif" e exibe na tela.
-    """
-    total_frames = 1 + len(steps)
-
-    fig, ax = _make_dark_axes(figsize=(10, 10))
-    fig.tight_layout()
-
-    def _draw_frame(frame_idx):
-        _reset_ax(ax)
-        _draw_points(ax, cars, passengers)
-        if frame_idx == 0:
-            ax.set_title("Iniciando...", color="white", fontsize=14, pad=15)
-        else:
-            _apply_step(ax, steps[frame_idx - 1], result)
-        ax.legend(**_LEGEND_DARK, fontsize=10, loc=_LEGEND_RIGHT)
-
-    anim = FuncAnimation(fig, _draw_frame, frames=total_frames,
-                         interval=1200, repeat=False)
-
-    writer = PillowWriter(fps=1000 // 1200 or 1)
-    anim.save("output_animation.gif", writer=writer, dpi=100,
-              savefig_kwargs={"facecolor": _FIG_BG})
-
-    plt.show()
-    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
